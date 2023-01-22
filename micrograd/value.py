@@ -2,28 +2,16 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from enum import Enum, auto
 from typing import TYPE_CHECKING
-
-
-class Operation(Enum):
-    ADD = auto()
-    MUL = auto()
-    TANH = auto()
-    EXP = auto()
-    POW = auto()
-
 
 if TYPE_CHECKING:
     AcceptableTypes = float | int | Value
 
 
 class Value:
-    def __init__(self, value: float, _children: tuple[Value, ...] = (), _op: Operation = None, label="") -> None:
+    def __init__(self, value: float, _children: tuple[Value, ...] = ()) -> None:
         self._value = value
         self._children = set(_children)
-        self._op = _op
-        self._label = label
 
         self._grad = 0.0
         self._backward = lambda: None
@@ -39,10 +27,6 @@ class Value:
     @property
     def children(self) -> set[Value]:
         return self._children
-
-    @property
-    def operation(self) -> Operation:
-        return self._op
 
     @property
     def label(self) -> str:
@@ -68,9 +52,21 @@ class Value:
         other = self._convert_other(other)
         return isinstance(other, Value) and self._value == other._value
 
+    def __lt__(self, other: AcceptableTypes) -> bool:
+        return self.value < self._convert_other(other).value
+
+    def __gt__(self, other: AcceptableTypes) -> bool:
+        return self.value > self._convert_other(other).value
+
+    def __le__(self, other: AcceptableTypes) -> bool:
+        return self.value <= self._convert_other(other).value
+
+    def __ge__(self, other: AcceptableTypes) -> bool:
+        return self.value >= self._convert_other(other).value
+
     def __add__(self, other: Value) -> Value:
         other = self._convert_other(other)
-        out = Value(self._value + other._value, (self, other), Operation.ADD)
+        out = Value(self._value + other._value, (self, other))
 
         def _backward():
             self._grad += out.grad
@@ -84,7 +80,7 @@ class Value:
 
     def __mul__(self, other: Value) -> Value:
         other = self._convert_other(other)
-        out = Value(self._value * other._value, (self, other), Operation.MUL)
+        out = Value(self._value * other._value, (self, other))
 
         def _backward():
             self._grad += out.grad * other.value
@@ -98,7 +94,7 @@ class Value:
 
     def __pow__(self, power: float) -> Value:
         assert isinstance(power, int | float), "Only supporting int and float for now"
-        out = Value(self.value**power, (self,), Operation.POW)
+        out = Value(self.value**power, (self,))
 
         def _backward():
             self._grad += out.grad * power * self.value ** (power - 1)
@@ -122,7 +118,7 @@ class Value:
         return self._convert_other(other) - self
 
     def exp(self) -> Value:
-        out = Value(math.exp(self.value), (self,), Operation.EXP)
+        out = Value(math.exp(self.value), (self,))
 
         def _backward():
             self._grad += out.grad * out.value
@@ -131,10 +127,19 @@ class Value:
         return out
 
     def tanh(self) -> Value:
-        out = Value(math.tanh(self.value), (self,), Operation.TANH)
+        out = Value(math.tanh(self.value), (self,))
 
         def _backward():
             self._grad += out.grad * (1 - out.value**2)
+
+        out._backward = _backward
+        return out
+
+    def relu(self) -> Value:
+        out = Value(max(0, self.value), (self,))
+
+        def _backward():
+            self._grad += out.grad * int((out.value > 0))
 
         out._backward = _backward
         return out

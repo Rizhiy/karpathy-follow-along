@@ -12,3 +12,12 @@ description = "Following along with Andrej Karpathy's youtube videos"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "flaky",
+]
+
+[tool.pytest.ini_options]
+addopts = "--no-success-flaky-report"
